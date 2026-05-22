@@ -105,7 +105,8 @@ func normalizeURLHost(host string) (string, netip.Addr, error) {
 	}
 
 	if isLiteral {
-		addr = addr.Unmap()
+		// Preserve IPv4-mapped IPv6 until CheckAddr applies custom prefix policy
+		// and the default special-purpose range block.
 		return addr.String(), addr, nil
 	}
 
