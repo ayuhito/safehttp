@@ -41,6 +41,7 @@ var (
 		netip.MustParsePrefix("2001:2::/48"),
 		netip.MustParsePrefix("2001:db8::/32"),
 		netip.MustParsePrefix("2002::/16"),
+		netip.MustParsePrefix("2620:4f:8000::/48"),
 		netip.MustParsePrefix("3fff::/20"),
 	})
 )

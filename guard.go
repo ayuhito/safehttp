@@ -249,9 +249,11 @@ func (g *Guard) CheckAddr(network string, addr netip.AddrPort) error {
 		return &BlockError{Reason: "port is not allowed", Port: addr.Port(), Addr: addr, err: ErrBlockedPort}
 	}
 
-	// Treat IPv4-mapped IPv6 as IPv4 before applying policy, so forms like
-	// ::ffff:127.0.0.1 cannot skip IPv4 private or loopback checks.
-	ip := addr.Addr().Unmap()
+	// Keep both forms for IPv4-mapped IPv6. Caller allow/deny policy is
+	// evaluated against the unmapped IPv4 address, but the default policy still
+	// blocks the mapped IPv6 special-purpose range unless the caller opts in.
+	originalIP := addr.Addr()
+	ip := originalIP.Unmap()
 
 	// Caller denies are checked first so explicit block rules cannot be
 	// weakened by a broader allow rule.
@@ -263,6 +265,13 @@ func (g *Guard) CheckAddr(network string, addr netip.AddrPort) error {
 	// bypass the built-in special-purpose range policy.
 	if _, ok := containsPrefix(g.customAllowV4, g.customAllowV6, ip); ok {
 		return nil
+	}
+
+	// IPv4-mapped IPv6 is an IANA special-purpose range. Block it by default so
+	// ::ffff:8.8.8.8 is not a second spelling for an otherwise public IPv4
+	// literal, while still allowing explicit prefix opt-ins above.
+	if originalIP.Is4In6() {
+		return &BlockError{Reason: "address is ipv4-mapped ipv6", Addr: addr, Rule: "::ffff:0:0/96", err: ErrBlockedAddress}
 	}
 
 	// netip.IsGlobalUnicast is not enough for this policy: it returns true for

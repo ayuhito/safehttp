@@ -37,6 +37,7 @@ func TestDefaultPolicy(t *testing.T) {
 		{name: "discard-only ipv6", url: "https://[100::1]", err: safehttp.ErrBlockedAddress},
 		{name: "link-local ipv6", url: "https://[fe80::1]", err: safehttp.ErrBlockedAddress},
 		{name: "documentation ipv6", url: "https://[2001:db8::1]", err: safehttp.ErrBlockedAddress},
+		{name: "direct delegation as112 ipv6", url: "https://[2620:4f:8000::1]", err: safehttp.ErrBlockedAddress},
 		{name: "sr-v6 sid ipv6", url: "https://[5f00::1]", err: safehttp.ErrBlockedAddress},
 	}
 
@@ -133,11 +134,17 @@ func TestURLParsingAndPorts(t *testing.T) {
 	require.NoError(t, guard.CheckURL(mustURL(t, "https://[2606:4700:4700::1111]")))
 
 	require.ErrorIs(t, guard.CheckURL(mustURL(t, "https://[::ffff:127.0.0.1]")), safehttp.ErrBlockedAddress)
+	require.ErrorIs(t, guard.CheckURL(mustURL(t, "https://[::ffff:8.8.8.8]")), safehttp.ErrBlockedAddress)
 
 	mappedAllow, err := safehttp.NewGuard(safehttp.AllowPrefixes(netip.MustParsePrefix("::ffff:127.0.0.1/128")))
 	require.NoError(t, err)
 
 	require.NoError(t, mappedAllow.CheckURL(mustURL(t, "https://[::ffff:127.0.0.1]")))
+
+	mappedPublicAllow, err := safehttp.NewGuard(safehttp.AllowCIDRs("8.8.8.8/32"))
+	require.NoError(t, err)
+
+	require.NoError(t, mappedPublicAllow.CheckURL(mustURL(t, "https://[::ffff:8.8.8.8]")))
 
 	mappedDeny, err := safehttp.NewGuard(safehttp.DenyPrefixes(netip.MustParsePrefix("::ffff:8.8.8.0/120")))
 	require.NoError(t, err)
