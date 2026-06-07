@@ -12,6 +12,7 @@ var (
 	ErrInvalidURL         = errors.New("safehttp: invalid url")
 	ErrBlockedScheme      = errors.New("safehttp: blocked scheme")
 	ErrBlockedHost        = errors.New("safehttp: blocked host")
+	ErrBlockedOrigin      = errors.New("safehttp: blocked origin")
 	ErrBlockedPort        = errors.New("safehttp: blocked port")
 	ErrBlockedMethod      = errors.New("safehttp: blocked method")
 	ErrBlockedAddress     = errors.New("safehttp: blocked address")

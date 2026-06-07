@@ -48,7 +48,28 @@ if err != nil {
 defer resp.Body.Close()
 ```
 
-If the set of valid destinations is known, add a host allowlist.
+If the trusted destination is a known base URL, allow its exact origin. The
+path, query string, and fragment are ignored. The policy is the normalized
+scheme, host, and effective port.
+
+```go
+client, err := safehttp.NewClient(
+	safehttp.AllowOrigins("https://api.example.com"),
+	safehttp.AllowMethods(http.MethodGet),
+	safehttp.MaxRedirects(3),
+	safehttp.ClientTimeout(5*time.Second),
+	safehttp.MaxResponseBytes(8<<20),
+)
+```
+
+`AllowOrigins` is an exact tuple policy. Multiple origins do not create
+cross-product allowances between schemes, hosts, and ports. Address checks still
+apply, so loopback or private test servers require an explicit `AllowCIDRs`
+opt-in.
+
+Use `AllowHosts` when the policy is genuinely host-pattern based, such as
+multiple exact hosts or a wildcard domain family. Pair it with explicit schemes
+and ports.
 
 ```go
 client, err := safehttp.NewClient(
@@ -57,6 +78,8 @@ client, err := safehttp.NewClient(
 		"uploads.github.com",
 		"*.githubusercontent.com",
 	),
+	safehttp.AllowSchemes("https"),
+	safehttp.AllowPorts(443),
 	safehttp.AllowMethods(http.MethodGet, http.MethodHead),
 	safehttp.MaxRedirects(3),
 	safehttp.ClientTimeout(5*time.Second),
@@ -72,7 +95,7 @@ Use `NewTransport` to reuse an existing transport configuration.
 base := http.DefaultTransport.(*http.Transport).Clone()
 base.MaxIdleConnsPerHost = 32
 
-rt, err := safehttp.NewTransport(base, safehttp.AllowHosts("api.github.com"))
+rt, err := safehttp.NewTransport(base, safehttp.AllowOrigins("https://api.github.com"))
 if err != nil {
 	return err
 }
@@ -90,7 +113,7 @@ certificate verification are rejected.
 `NewGuard` exposes validation without constructing an `http.Client`.
 
 ```go
-guard, err := safehttp.NewGuard(safehttp.AllowHosts("api.github.com"))
+guard, err := safehttp.NewGuard(safehttp.AllowOrigins("https://api.github.com"))
 if err != nil {
 	return err
 }
@@ -115,7 +138,9 @@ func NewGuard(opts ...Option) (*Guard, error)
 
 Options:
 
-- destination policy: `AllowSchemes`, `AllowPorts`, `AllowHosts`, `AllowMethods`
+- exact destination policy: `AllowOrigins`
+- component destination policy: `AllowHosts`, `AllowSchemes`, `AllowPorts`
+- request policy: `AllowMethods`
 - redirects: `MaxRedirects`, `NoRedirects`
 - explicit opt-ins: `AllowCredentials`, `AllowCustomHostHeader`
 - address policy: `AllowPrefixes`, `DenyPrefixes`, `AllowCIDRs`, `DenyCIDRs`

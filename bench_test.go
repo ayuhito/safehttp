@@ -26,6 +26,21 @@ func BenchmarkCheckURLExactHost(b *testing.B) {
 	}
 }
 
+func BenchmarkCheckURLOrigin(b *testing.B) {
+	guard, err := safehttp.NewGuard(safehttp.AllowOrigins("https://example.com"))
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	u := mustBenchmarkURL(b, "https://example.com/path")
+
+	for b.Loop() {
+		if err := guard.CheckURL(u); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
 func BenchmarkCheckURLWildcardHost(b *testing.B) {
 	guard, err := safehttp.NewGuard(safehttp.AllowHosts("*.example.com"))
 	if err != nil {

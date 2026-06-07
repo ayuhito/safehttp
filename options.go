@@ -16,6 +16,7 @@ type options struct {
 	schemes           []string
 	ports             []uint16
 	hosts             []string
+	origins           []string
 	methods           []string
 	maxRedirects      int
 	allowCredentials  bool
@@ -26,6 +27,10 @@ type options struct {
 	clientTimeout     time.Duration
 	maxResponseHeader int64
 	maxResponseBytes  int64
+	explicitSchemes   bool
+	explicitPorts     bool
+	explicitHosts     bool
+	explicitOrigins   bool
 }
 
 // AllowSchemes replaces the default allowed URL schemes.
@@ -33,11 +38,16 @@ func AllowSchemes(schemes ...string) Option {
 	schemes = slices.Clone(schemes)
 
 	return func(o *options) error {
+		if o.explicitOrigins {
+			return fmt.Errorf("safehttp: AllowSchemes cannot be combined with AllowOrigins")
+		}
+
 		if len(schemes) == 0 {
 			return fmt.Errorf("safehttp: allowed schemes cannot be empty")
 		}
 
 		o.schemes = schemes
+		o.explicitSchemes = true
 
 		return nil
 	}
@@ -48,6 +58,10 @@ func AllowPorts(ports ...uint16) Option {
 	ports = slices.Clone(ports)
 
 	return func(o *options) error {
+		if o.explicitOrigins {
+			return fmt.Errorf("safehttp: AllowPorts cannot be combined with AllowOrigins")
+		}
+
 		if len(ports) == 0 {
 			return fmt.Errorf("safehttp: allowed ports cannot be empty")
 		}
@@ -57,6 +71,7 @@ func AllowPorts(ports ...uint16) Option {
 		}
 
 		o.ports = ports
+		o.explicitPorts = true
 
 		return nil
 	}
@@ -67,11 +82,42 @@ func AllowHosts(hosts ...string) Option {
 	hosts = slices.Clone(hosts)
 
 	return func(o *options) error {
+		if o.explicitOrigins {
+			return fmt.Errorf("safehttp: AllowHosts cannot be combined with AllowOrigins")
+		}
+
 		if len(hosts) == 0 {
 			return fmt.Errorf("safehttp: allowed hosts cannot be empty")
 		}
 
 		o.hosts = hosts
+		o.explicitHosts = true
+
+		return nil
+	}
+}
+
+// AllowOrigins restricts requests to exact URL origins.
+//
+// Origins are normalized as scheme, host, and effective port. Path, query, and
+// fragment components are ignored. AllowOrigins is an exact tuple policy, so
+// multiple origins do not create cross-product allowances.
+//
+// AllowOrigins cannot be combined with AllowSchemes, AllowPorts, or AllowHosts.
+func AllowOrigins(origins ...string) Option {
+	origins = slices.Clone(origins)
+
+	return func(o *options) error {
+		if o.explicitSchemes || o.explicitPorts || o.explicitHosts {
+			return fmt.Errorf("safehttp: AllowOrigins cannot be combined with AllowSchemes, AllowPorts, or AllowHosts")
+		}
+
+		if len(origins) == 0 {
+			return fmt.Errorf("safehttp: allowed origins cannot be empty")
+		}
+
+		o.origins = origins
+		o.explicitOrigins = true
 
 		return nil
 	}
