@@ -150,14 +150,6 @@ Options:
 example private infrastructure or local tests. `DenyPrefixes` and `DenyCIDRs`
 make the address policy stricter. Deny rules are evaluated before allow rules.
 
-## Performance
-
-Create one client and reuse it. The added checks are negligible to performance and is safe to use concurrently.
-
-```sh
-go test -run '^$' -bench Benchmark -benchmem
-```
-
 ## Acknowledgements
 
 This library was inspired by and borrows from the following projects:
