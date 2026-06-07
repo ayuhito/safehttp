@@ -3,12 +3,104 @@ package safehttp
 import (
 	"fmt"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"unicode"
 
 	"golang.org/x/net/http/httpguts"
 )
+
+type origin struct {
+	scheme string
+	host   string
+	port   uint16
+}
+
+type originMatcher struct {
+	origins map[origin]struct{}
+	ports   []uint16
+}
+
+func compileOriginMatcher(rawOrigins []string) (originMatcher, error) {
+	if len(rawOrigins) == 0 {
+		return originMatcher{}, nil
+	}
+
+	matcher := originMatcher{
+		origins: make(map[origin]struct{}, len(rawOrigins)),
+	}
+
+	for _, rawOrigin := range rawOrigins {
+		normalized, err := normalizeOrigin(rawOrigin)
+		if err != nil {
+			return originMatcher{}, fmt.Errorf("safehttp: invalid origin %q: %w", rawOrigin, err)
+		}
+
+		matcher.origins[normalized] = struct{}{}
+		if !slices.Contains(matcher.ports, normalized.port) {
+			matcher.ports = append(matcher.ports, normalized.port)
+		}
+	}
+
+	return matcher, nil
+}
+
+func normalizeOrigin(rawOrigin string) (origin, error) {
+	rawOrigin = strings.TrimSpace(rawOrigin)
+	if rawOrigin == "" {
+		return origin{}, fmt.Errorf("origin cannot be empty")
+	}
+
+	u, err := url.Parse(rawOrigin)
+	if err != nil {
+		return origin{}, err
+	}
+
+	if u.User != nil {
+		return origin{}, fmt.Errorf("origin must not include credentials")
+	}
+
+	scheme, err := normalizeScheme(u.Scheme)
+	if err != nil {
+		return origin{}, err
+	}
+
+	host := u.Hostname()
+	if host == "" {
+		return origin{}, fmt.Errorf("missing host")
+	}
+
+	if strings.Contains(host, "*") {
+		return origin{}, fmt.Errorf("origin host must not include wildcards")
+	}
+
+	port, err := effectivePort(u, scheme)
+	if err != nil {
+		return origin{}, err
+	}
+
+	normalizedHost, _, err := normalizeURLHost(host)
+	if err != nil {
+		return origin{}, err
+	}
+
+	return origin{scheme: scheme, host: normalizedHost, port: port}, nil
+}
+
+func (m originMatcher) configured() bool {
+	return len(m.origins) > 0
+}
+
+func (m originMatcher) allows(origin origin) bool {
+	if !m.configured() {
+		return true
+	}
+
+	_, ok := m.origins[origin]
+
+	return ok
+}
 
 // normalizeScheme accepts URI schemes, not full URL prefixes.
 //

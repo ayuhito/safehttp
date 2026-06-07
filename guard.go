@@ -19,6 +19,7 @@ type Guard struct {
 	schemes           map[string]struct{}
 	ports             []uint16
 	hosts             hostMatcher
+	origins           originMatcher
 	methods           map[string]struct{}
 	maxRedirects      int
 	allowCredentials  bool
@@ -63,15 +64,23 @@ func NewGuard(opts ...Option) (*Guard, error) {
 	}
 
 	var err error
-	if g.schemes, err = compileSchemes(cfg.schemes); err != nil {
-		return nil, err
+	if cfg.explicitOrigins {
+		if g.origins, err = compileOriginMatcher(cfg.origins); err != nil {
+			return nil, err
+		}
+
+		g.ports = g.origins.ports
+	} else {
+		if g.schemes, err = compileSchemes(cfg.schemes); err != nil {
+			return nil, err
+		}
+
+		if g.hosts, err = compileHostMatcher(cfg.hosts); err != nil {
+			return nil, err
+		}
 	}
 
 	if g.methods, err = compileMethods(cfg.methods); err != nil {
-		return nil, err
-	}
-
-	if g.hosts, err = compileHostMatcher(cfg.hosts); err != nil {
 		return nil, err
 	}
 
@@ -97,11 +106,14 @@ func (g *Guard) CheckURL(u *url.URL) error {
 		return newURLBlockError(ErrInvalidURL, "missing scheme", u)
 	}
 
-	if _, ok := g.schemes[scheme]; !ok {
-		block := newURLBlockError(ErrBlockedScheme, "scheme is not allowed", u)
-		block.Scheme = scheme
+	originMode := g.origins.configured()
+	if !originMode {
+		if _, ok := g.schemes[scheme]; !ok {
+			block := newURLBlockError(ErrBlockedScheme, "scheme is not allowed", u)
+			block.Scheme = scheme
 
-		return block
+			return block
+		}
 	}
 
 	if u.User != nil && !g.allowCredentials {
@@ -121,7 +133,7 @@ func (g *Guard) CheckURL(u *url.URL) error {
 		return block
 	}
 
-	if !slices.Contains(g.ports, port) {
+	if !originMode && !slices.Contains(g.ports, port) {
 		block := newURLBlockError(ErrBlockedPort, "port is not allowed", u)
 		block.Host = host
 		block.Port = port
@@ -129,9 +141,10 @@ func (g *Guard) CheckURL(u *url.URL) error {
 		return block
 	}
 
-	// Host policy is applied to normalized ASCII form. For IP literal hosts,
-	// normalizeURLHost also returns the parsed address so we can apply the same
-	// public-address policy immediately, before any transport is involved.
+	// Host and origin policy is applied to normalized ASCII form. For IP
+	// literal hosts, normalizeURLHost also returns the parsed address so we can
+	// apply the same public-address policy immediately, before any transport is
+	// involved.
 	normalizedHost, addr, err := normalizeURLHost(host)
 	if err != nil {
 		block := newURLBlockError(ErrInvalidURL, err.Error(), u)
@@ -141,7 +154,16 @@ func (g *Guard) CheckURL(u *url.URL) error {
 		return block
 	}
 
-	if !g.hosts.allows(normalizedHost) {
+	if originMode {
+		if !g.origins.allows(origin{scheme: scheme, host: normalizedHost, port: port}) {
+			block := newURLBlockError(ErrBlockedOrigin, "origin is not allowed", u)
+			block.Scheme = scheme
+			block.Host = normalizedHost
+			block.Port = port
+
+			return block
+		}
+	} else if !g.hosts.allows(normalizedHost) {
 		block := newURLBlockError(ErrBlockedHost, "host is not allowed", u)
 		block.Host = normalizedHost
 		block.Port = port
