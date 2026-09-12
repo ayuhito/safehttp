@@ -7,6 +7,16 @@ import (
 	"time"
 )
 
+// MustNewClient is like NewClient but panics if construction fails.
+// Use it for static configuration whose errors are programming mistakes.
+func MustNewClient(opts ...Option) *http.Client {
+	client, err := NewClient(opts...)
+	if err != nil {
+		panic(err)
+	}
+	return client
+}
+
 // NewClient builds an HTTP client with a guarded transport and redirect policy.
 func NewClient(opts ...Option) (*http.Client, error) {
 	guard, err := NewGuard(opts...)
@@ -42,6 +52,16 @@ func NewTransport(base *http.Transport, opts ...Option) (http.RoundTripper, erro
 		guard: guard,
 		next:  transport,
 	}, nil
+}
+
+// MustNewTransport is like NewTransport but panics if construction fails.
+// Use it for static configuration whose errors are programming mistakes.
+func MustNewTransport(base *http.Transport, opts ...Option) http.RoundTripper {
+	transport, err := NewTransport(base, opts...)
+	if err != nil {
+		panic(err)
+	}
+	return transport
 }
 
 func cloneTransport(base *http.Transport, guard *Guard) (*http.Transport, error) {

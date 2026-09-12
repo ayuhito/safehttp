@@ -90,6 +90,16 @@ func NewGuard(opts ...Option) (*Guard, error) {
 	return g, nil
 }
 
+// MustNewGuard is like NewGuard but panics if construction fails.
+// Use it for static configuration whose errors are programming mistakes.
+func MustNewGuard(opts ...Option) *Guard {
+	guard, err := NewGuard(opts...)
+	if err != nil {
+		panic(err)
+	}
+	return guard
+}
+
 // CheckURL validates a URL before it is used for an outbound request.
 //
 // This check works only from the parsed url.URL fields; callers should parse
