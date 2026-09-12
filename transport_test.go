@@ -15,6 +15,24 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestMustConstructors(t *testing.T) {
+	client := safehttp.MustNewClient(safehttp.ClientTimeout(3 * time.Second))
+	require.Equal(t, 3*time.Second, client.Timeout)
+	require.NotNil(t, safehttp.MustNewTransport(&http.Transport{}))
+	guard := safehttp.MustNewGuard(safehttp.AllowOrigins("https://api.example.com"))
+	require.NoError(t, guard.CheckURL(mustURL(t, "https://api.example.com")))
+	require.ErrorIs(t, guard.CheckURL(mustURL(t, "https://other.example.com")), safehttp.ErrBlockedOrigin)
+
+	require.Panics(t, func() { safehttp.MustNewClient(nil) })
+	require.Panics(t, func() { safehttp.MustNewTransport(nil, nil) })
+	require.Panics(t, func() { safehttp.MustNewGuard(nil) })
+	require.Panics(t, func() {
+		safehttp.MustNewTransport(&http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		})
+	})
+}
+
 func TestTransportSafety(t *testing.T) {
 	_, err := safehttp.NewTransport(nil)
 	require.NoError(t, err)

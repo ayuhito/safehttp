@@ -87,6 +87,23 @@ client, err := safehttp.NewClient(
 )
 ```
 
+### Must Helpers
+
+Use `MustNewClient`, `MustNewTransport`, or `MustNewGuard` for hard-coded startup
+policies. They panic if construction fails. Use `New*` when configuration errors
+need handling.
+
+```go
+var client = safehttp.MustNewClient(
+	safehttp.AllowOrigins("https://api.example.com"),
+	safehttp.NoRedirects(),
+	safehttp.ClientTimeout(5*time.Second),
+)
+```
+
+Request failures, including blocked destinations and DNS failures, still return
+errors normally.
+
 ## Existing Transports
 
 Use `NewTransport` to reuse an existing transport configuration.
@@ -134,6 +151,10 @@ Constructors:
 func NewClient(opts ...Option) (*http.Client, error)
 func NewTransport(base *http.Transport, opts ...Option) (http.RoundTripper, error)
 func NewGuard(opts ...Option) (*Guard, error)
+
+func MustNewClient(opts ...Option) *http.Client
+func MustNewTransport(base *http.Transport, opts ...Option) http.RoundTripper
+func MustNewGuard(opts ...Option) *Guard
 ```
 
 Options:
