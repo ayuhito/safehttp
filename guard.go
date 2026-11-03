@@ -210,9 +210,9 @@ func (g *Guard) CheckRequest(req *http.Request) error {
 		// Setting Request.Host to the same authority the transport would send is
 		// valid. Anything else is host-header smuggling and stays blocked unless
 		// the caller explicitly opts in.
-		matchesURL := false
+		matchesURL := req.URL != nil && req.Host == req.URL.Host
 
-		if req.URL != nil {
+		if !matchesURL && req.URL != nil {
 			scheme := strings.ToLower(req.URL.Scheme)
 			hostURL := &url.URL{Scheme: scheme, Host: req.Host}
 
