@@ -129,6 +129,9 @@ type roundTripper struct {
 
 func (rt *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	if err := rt.guard.CheckRequest(req); err != nil {
+		if req != nil && req.Body != nil {
+			req.Body.Close()
+		}
 		return nil, err
 	}
 
