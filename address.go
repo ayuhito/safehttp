@@ -78,7 +78,7 @@ func splitPrefixes(prefixes []netip.Prefix) ([]netip.Prefix, []netip.Prefix) {
 	slices.SortFunc(v4, netip.Prefix.Compare)
 	slices.SortFunc(v6, netip.Prefix.Compare)
 
-	return v4, v6
+	return slices.Compact(v4), slices.Compact(v6)
 }
 
 // containsPrefix reports the first matching policy prefix for an IP address.
